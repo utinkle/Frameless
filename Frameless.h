@@ -7,12 +7,14 @@
 #include <QRect>
 #include <QString>
 
-class QWidget;
 class QEvent;
+class QWidget;
 class QMouseEvent;
 class QFocusEvent;
+class FramelessWorker;
 class Frameless
 {
+    friend class FramelessWorker;
 public:
     Frameless(QWidget *self);
 
@@ -29,31 +31,32 @@ protected:
         BottomRight
     };
 
+    void setDirection(Direction dir);
+    Direction direction() const;
+
     virtual bool canWindowMove() = 0;
 
     void setCanWindowResize(bool canResize);
     bool canWindowResize() const;
 
-    void focusIn();
-    void mouseHover(const QPoint &globalPos);
-    void mousePress(const QPoint &globalPos);
-    void mouseMove(const QPoint &globalPos);
-    void mouseRelease();
-    void leave();
+    void setDragPosition(const QPoint &dragPosition);
+    QPoint dragPosition() const;
+
+    void setLeftMouseButtonPressed(bool pressed);
+    bool leftMouseButtonPressed() const;
+
     void event(QEvent *event);
 
-    void calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint);
-    QRect calcPositionRect(const QRect &rOrigin, const QPoint &gloPoint);
-    QRect calcOriginRect();
-    QPoint calcFakeGlobalPos(const QPoint &gloPoint);
-
 private:
-    QWidget *   mSelf;
-    QPoint      mPoint;
-    QPoint      mDragPosition;
-    Direction   mDir;
-    bool        mLeftButtonPress;
-    bool        mCanWindowResize;
+    // worker and target
+    QWidget *           mSelf;
+    FramelessWorker *   mWorker;
+    bool                mCanWindowResize;
+
+    // state for window
+    QPoint              mDragPosition;
+    Direction           mDir;
+    bool                mLeftButtonPress;
 };
 
 #endif // FRAMELESS_H

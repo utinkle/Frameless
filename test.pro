@@ -10,11 +10,15 @@ CONFIG += c++17
 
 SOURCES += \
     Frameless.cpp \
+    FramelessWorker.cpp \
+    FramelessWorkerEvent.cpp \
     main.cpp \
     Widget.cpp
 
 HEADERS += \
     Frameless.h \
+    FramelessWorker.h \
+    FramelessWorkerEvent.h \
     Widget.h
 
 # Default rules for deployment.
