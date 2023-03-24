@@ -3,6 +3,7 @@
 
 #include <QEvent>
 #include <QMargins>
+#include <QObject>
 #include <QPoint>
 #include <QRect>
 #include <QString>
@@ -12,13 +13,21 @@ class QWidget;
 class QMouseEvent;
 class QFocusEvent;
 class FramelessWorker;
-class Frameless
+class Frameless : public QObject
 {
-    friend class FramelessWorker;
-public:
-    Frameless(QWidget *self);
+    Q_OBJECT
 
-protected:
+public:
+    explicit Frameless(QWidget *self, QObject *parent = nullptr);
+
+    void setCanWindowMove(bool canMove);
+    bool canWindowMove() const;
+
+    void setCanWindowResize(bool canResize);
+    bool canWindowResize() const;
+
+    int framelessBorder() const;
+
     enum class Direction {
         None = -1,
         Up,
@@ -34,29 +43,31 @@ protected:
     void setDirection(Direction dir);
     Direction direction() const;
 
-    virtual bool canWindowMove() = 0;
-
-    void setCanWindowResize(bool canResize);
-    bool canWindowResize() const;
-
     void setDragPosition(const QPoint &dragPosition);
     QPoint dragPosition() const;
 
     void setLeftMouseButtonPressed(bool pressed);
     bool leftMouseButtonPressed() const;
 
-    void event(QEvent *event);
+    void targetEvent(QEvent *event);
+
+    Q_INVOKABLE void moveByFrameless(const QPoint &pos);
+    Q_INVOKABLE void setGeometryByFrameless(const QRect &rect);
+    Q_INVOKABLE void setCursorByFrameless(int shape);
+    Q_INVOKABLE void unsetCursorByFrameless();
 
 private:
     // worker and target
     QWidget *           mSelf;
     FramelessWorker *   mWorker;
+    bool                mCanWindowMove;
     bool                mCanWindowResize;
 
     // state for window
     QPoint              mDragPosition;
     Direction           mDir;
     bool                mLeftButtonPress;
+    bool                mAlreadyChangeCursor;
 };
 
 #endif // FRAMELESS_H

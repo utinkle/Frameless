@@ -1,11 +1,11 @@
 #ifndef WIDGET_H
 #define WIDGET_H
 
-#include "Frameless.h"
+#include "FramelessWidget.h"
 
 #include <QWidget>
 
-class Widget : public QWidget, public Frameless
+class Widget : public FramelessWidget
 {
     Q_OBJECT
 
@@ -17,7 +17,5 @@ protected:
     inline bool canWindowMove() override {
         return true;
     }
-
-    bool event(QEvent *event) override;
 };
 #endif // WIDGET_H

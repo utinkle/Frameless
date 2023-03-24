@@ -6,13 +6,19 @@
 #include <QMouseEvent>
 #include <QRect>
 #include <QDebug>
+#include <QApplication>
 
-Frameless::Frameless(QWidget *self)
-    : mSelf(self)
+#define FREMELESS_BORDER 6
+
+Frameless::Frameless(QWidget *self, QObject *parent)
+    : QObject(parent)
+    , mSelf(self)
     , mWorker(FramelessWorker::instance())
+    , mCanWindowMove(false)
     , mCanWindowResize(false)
     , mDir(Direction::None)
     , mLeftButtonPress(false)
+    , mAlreadyChangeCursor(false)
 {
     mSelf->setWindowFlags(mSelf->windowFlags() | Qt::FramelessWindowHint);
     setCanWindowResize(true);
@@ -29,6 +35,16 @@ Frameless::Direction Frameless::direction() const
     return mDir;
 }
 
+void Frameless::setCanWindowMove(bool canMove)
+{
+    mCanWindowMove = canMove;
+}
+
+bool Frameless::canWindowMove() const
+{
+    return mCanWindowMove;
+}
+
 void Frameless::setCanWindowResize(bool canResize)
 {
     if (mCanWindowResize == canResize)
@@ -41,6 +57,11 @@ void Frameless::setCanWindowResize(bool canResize)
 bool Frameless::canWindowResize() const
 {
     return mCanWindowResize;
+}
+
+int Frameless::framelessBorder() const
+{
+    return FREMELESS_BORDER;
 }
 
 void Frameless::setDragPosition(const QPoint &dragPosition)
@@ -63,13 +84,14 @@ bool Frameless::leftMouseButtonPressed() const
     return mLeftButtonPress;
 }
 
-void Frameless::event(QEvent *event)
+void Frameless::targetEvent(QEvent *event)
 {
     FramelessEvent *framelessEvent = nullptr;
     switch (event->type()) {
     case QEvent::HoverMove: {
         FramelessMouseHoverEvent *mouseHoverEvent = new FramelessMouseHoverEvent();
         mouseHoverEvent->globalCursorPositon = mSelf->mapToGlobal(static_cast<QHoverEvent *>(event)->pos());
+        mouseHoverEvent->canWindowResize = mCanWindowResize;
         framelessEvent = mouseHoverEvent;
 
         event->accept();
@@ -82,7 +104,7 @@ void Frameless::event(QEvent *event)
 
         FramelessMousePressEvent *mousePressEvent = new FramelessMousePressEvent();
         mousePressEvent->globalCursorPositon = mouseEvent->globalPos();
-        mousePressEvent->canWindowMove = canWindowMove();
+        mousePressEvent->canWindowMove = mCanWindowMove;
         framelessEvent = mousePressEvent;
 
         mouseEvent->accept();
@@ -95,6 +117,7 @@ void Frameless::event(QEvent *event)
         break;
     case QEvent::MouseMove: {
         FramelessMouseMoveEvent *mouseMoveEvent = new FramelessMouseMoveEvent();
+        mouseMoveEvent->canWindowMove = mCanWindowMove;
         mouseMoveEvent->canWindowResize = mCanWindowResize;
         mouseMoveEvent->globalCursorPositon = static_cast<QMouseEvent *>(event)->globalPos();
 
@@ -122,4 +145,41 @@ void Frameless::event(QEvent *event)
 
         mWorker->postEvent(framelessEvent);
     }
+}
+
+void Frameless::moveByFrameless(const QPoint &pos)
+{
+    mSelf->move(pos);
+}
+
+void Frameless::setGeometryByFrameless(const QRect &rect)
+{
+    mSelf->setGeometry(rect);
+}
+
+void Frameless::setCursorByFrameless(int shape)
+{
+    if (mAlreadyChangeCursor) {
+        if (shape == Qt::ArrowCursor) {
+            unsetCursorByFrameless();
+            return;
+        }
+
+        qApp->changeOverrideCursor(Qt::CursorShape(shape));
+    } else {
+        if (shape == Qt::ArrowCursor)
+            return;
+
+        qApp->setOverrideCursor(Qt::CursorShape(shape));
+        mAlreadyChangeCursor = true;
+    }
+}
+
+void Frameless::unsetCursorByFrameless()
+{
+    if (!mAlreadyChangeCursor)
+        return;
+
+    qApp->restoreOverrideCursor();
+    mAlreadyChangeCursor = false;
 }

@@ -5,8 +5,7 @@
 #include <QWidget>
 #include <QApplication>
 #include <QDebug>
-
-#define PADDING 4
+#include <QLayout>
 
 FramelessWorker *FramelessWorker::mInstance = nullptr;
 
@@ -27,7 +26,10 @@ FramelessWorker *FramelessWorker::instance()
 
 void FramelessWorker::exit()
 {
+    mMutex.lock();
     mExit = true;
+    mCondition.wakeAll();
+    mMutex.unlock();
     wait();
 }
 
@@ -98,46 +100,46 @@ void FramelessWorker::run()
         delete event;
     }
 }
-FramelessWorker::DirAndCursorShape FramelessWorker::calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint)
+FramelessWorker::DirAndCursorShape FramelessWorker::calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint, int framelessBorder)
 {
     int x = cursorGlobalPoint.x();
     int y = cursorGlobalPoint.y();
 
     DirAndCursorShape dirAndShape;
-    if (rOrigin.x() + PADDING >= x
+    if (rOrigin.x() + framelessBorder >= x
             && rOrigin.x() <= x
-            && rOrigin.y() + PADDING >= y
+            && rOrigin.y() + framelessBorder >= y
             && rOrigin.y() <= y) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::TopLeft);
         dirAndShape.cursorShape = Qt::SizeFDiagCursor;
-    } else if (x >= rOrigin.right() - PADDING
+    } else if (x >= rOrigin.right() - framelessBorder
               && x <= rOrigin.right()
-              && y >= rOrigin.bottom() - PADDING
+              && y >= rOrigin.bottom() - framelessBorder
               && y <= rOrigin.bottom()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::BottomRight);
         dirAndShape.cursorShape = Qt::SizeFDiagCursor;
-    } else if (x <= rOrigin.x() + PADDING
+    } else if (x <= rOrigin.x() + framelessBorder
               && x >= rOrigin.x()
-              && y >= rOrigin.bottom() - PADDING
+              && y >= rOrigin.bottom() - framelessBorder
               && y <= rOrigin.bottom()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::BottomLeft);
         dirAndShape.cursorShape = Qt::SizeBDiagCursor;
     } else if (x <= rOrigin.right()
-              && x >= rOrigin.right() - PADDING
+              && x >= rOrigin.right() - framelessBorder
               && y >= rOrigin.y()
-              && y <= rOrigin.y() + PADDING) {
+              && y <= rOrigin.y() + framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::TopRight);
         dirAndShape.cursorShape = Qt::SizeBDiagCursor;
-    } else if (x <= rOrigin.x() + PADDING && x >= rOrigin.x()) {
+    } else if (x <= rOrigin.x() + framelessBorder && x >= rOrigin.x()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Left);
         dirAndShape.cursorShape = Qt::SizeHorCursor;
-    } else if (x <= rOrigin.right() && x >= rOrigin.right() - PADDING) {
+    } else if (x <= rOrigin.right() && x >= rOrigin.right() - framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Right);
         dirAndShape.cursorShape = Qt::SizeHorCursor;
-    } else if (y >= rOrigin.y() && y <= rOrigin.y() + PADDING) {
+    } else if (y >= rOrigin.y() && y <= rOrigin.y() + framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Up);
         dirAndShape.cursorShape = Qt::SizeVerCursor;
-    } else if (y <= rOrigin.bottom() && y >= rOrigin.bottom() - PADDING) {
+    } else if (y <= rOrigin.bottom() && y >= rOrigin.bottom() - framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Down);
         dirAndShape.cursorShape = Qt::SizeVerCursor;
     } else {
@@ -294,19 +296,36 @@ void FramelessWorker::focusIn(FramelessFocusInEvent *event)
     if (!event->canWindowResize)
         return;
 
-    DirAndCursorShape dirAndShape = calcDirAndCursorShape(calcOriginRect(event->target), calcFakeGlobalPos(event->target, event->target->cursor().pos()));
-    event->target->setCursor(dirAndShape.cursorShape);
+    DirAndCursorShape dirAndShape = calcDirAndCursorShape(calcOriginRect(event->target),
+                                                          calcFakeGlobalPos(event->target, event->target->cursor().pos()),
+                                                          event->frameless->framelessBorder());
+    QMetaObject::invokeMethod(event->frameless, "setCursorByFrameless", Qt::QueuedConnection,
+                              Q_ARG(int, int(dirAndShape.cursorShape)));
     event->frameless->setDirection(static_cast<Frameless::Direction>(dirAndShape.dir));
 }
 
 void FramelessWorker::mouseHover(FramelessMouseHoverEvent *event)
 {
-    if (event->frameless->leftMouseButtonPressed())
+
+    if (event->frameless->leftMouseButtonPressed()
+            || !event->canWindowResize)
         return;
 
-    DirAndCursorShape dirAndShape = calcDirAndCursorShape(calcOriginRect(event->target), calcFakeGlobalPos(event->target, event->globalCursorPositon));
-    event->target->setCursor(dirAndShape.cursorShape);
+    QWidget *window = event->target->window();
+    if (!window || (window == event->target && window->isMaximized()))
+        return;
+
+    QRect rect = calcOriginRect(event->target);
+    if (QLayout *layout = event->target->layout()) {
+        int margin = layout->margin();
+        rect.adjust(margin, margin, -margin, -margin);
+    }
+
+    DirAndCursorShape dirAndShape = calcDirAndCursorShape(rect, calcFakeGlobalPos(event->target, event->globalCursorPositon),
+                                                          event->frameless->framelessBorder());
     event->frameless->setDirection(static_cast<Frameless::Direction>(dirAndShape.dir));
+    QMetaObject::invokeMethod(event->frameless, "setCursorByFrameless", Qt::QueuedConnection,
+                              Q_ARG(int, int(dirAndShape.cursorShape)));
 }
 
 
@@ -317,7 +336,8 @@ void FramelessWorker::mousePress(FramelessMousePressEvent *event)
     if (event->frameless->direction() == Frameless::Direction::None) {
         if (event->canWindowMove) {
             event->frameless->setDragPosition(event->globalCursorPositon - event->target->frameGeometry().topLeft());
-            event->target->setCursor(QCursor(Qt::SizeAllCursor));
+            QMetaObject::invokeMethod(event->frameless, "setCursorByFrameless", Qt::QueuedConnection,
+                                      Q_ARG(int, int(Qt::SizeAllCursor)));
         }
     } else {
         event->target->releaseMouse();
@@ -329,7 +349,8 @@ void FramelessWorker::mouseMove(FramelessMouseMoveEvent *event)
     QPoint gloPoint = event->globalCursorPositon;
 
     if (event->frameless->leftMouseButtonPressed()
-            && (event->frameless->direction() == Frameless::Direction::None)) {
+            && (event->frameless->direction() == Frameless::Direction::None)
+            && event->canWindowMove) {
         if (event->target->isMaximized()) {
             // event->target->showNormal();
 
@@ -345,21 +366,27 @@ void FramelessWorker::mouseMove(FramelessMouseMoveEvent *event)
             return;
         }
 
-        event->target->move(event->globalCursorPositon - event->frameless->dragPosition());
+        QMetaObject::invokeMethod(event->frameless, "moveByFrameless", Qt::QueuedConnection,
+                                  Q_ARG(QPoint, event->globalCursorPositon - event->frameless->dragPosition()));
         return;
     }
 
     if (event->frameless->leftMouseButtonPressed() && event->canWindowResize) {
         gloPoint = calcFakeGlobalPos(event->target, gloPoint);
-        event->target->setGeometry(calcPositionRect(static_cast<int>(event->frameless->direction()), event->target, calcOriginRect(event->target), gloPoint));
+
+        const QRect &rect = calcPositionRect(static_cast<int>(event->frameless->direction()),
+                                             event->target, calcOriginRect(event->target), gloPoint);
+        QMetaObject::invokeMethod(event->frameless, "setGeometryByFrameless", Qt::QueuedConnection,
+                                  Q_ARG(QRect, rect));
     }
 }
 
 void FramelessWorker::mouseRelease(FramelessMouseReleaseEvent *event)
 {
-    event->target->setCursor(QCursor(Qt::ArrowCursor));
+    QMetaObject::invokeMethod(event->frameless, "unsetCursorByFrameless", Qt::QueuedConnection);
     event->frameless->setLeftMouseButtonPressed(false);
     event->frameless->setDirection(Frameless::Direction::None);
+    event->frameless->setDragPosition({0, 0});
 }
 
 void FramelessWorker::leave(FramelessLeaveEvent *event)
@@ -368,5 +395,5 @@ void FramelessWorker::leave(FramelessLeaveEvent *event)
         return;
 
     event->frameless->setDirection(Frameless::Direction::None);
-    event->target->setCursor(QCursor(Qt::ArrowCursor));
+    QMetaObject::invokeMethod(event->frameless, "unsetCursorByFrameless", Qt::QueuedConnection);
 }

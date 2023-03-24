@@ -38,7 +38,7 @@ protected:
         int dir = -1;
         Qt::CursorShape cursorShape = Qt::ArrowCursor;
     };
-    static DirAndCursorShape calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint);
+    static DirAndCursorShape calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint, int framelessBorder);
     static QRect calcPositionRect(int dir, QWidget *target, const QRect &rOrigin, const QPoint &gloPoint);
     static QRect calcOriginRect(QWidget *taget);
     static QPoint calcFakeGlobalPos(QWidget *taget, const QPoint &gloPoint);

@@ -10,6 +10,7 @@ CONFIG += c++17
 
 SOURCES += \
     Frameless.cpp \
+    FramelessWidget.cpp \
     FramelessWorker.cpp \
     FramelessWorkerEvent.cpp \
     main.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
 
 HEADERS += \
     Frameless.h \
+    FramelessWidget.h \
     FramelessWorker.h \
     FramelessWorkerEvent.h \
     Widget.h

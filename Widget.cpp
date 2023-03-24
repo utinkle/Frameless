@@ -4,8 +4,7 @@
 #include <QLabel>
 
 Widget::Widget(QWidget *parent)
-    : QWidget(parent)
-    , Frameless(this)
+    : FramelessWidget(parent)
 {
     resize(800, 600);
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
@@ -20,11 +19,3 @@ Widget::Widget(QWidget *parent)
 Widget::~Widget()
 {
 }
-
-bool Widget::event(QEvent *event)
-{
-    Frameless::event(event);
-
-    return QWidget::event(event);
-}
-

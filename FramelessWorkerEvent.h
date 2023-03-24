@@ -40,6 +40,8 @@ struct FramelessMouseHoverEvent : public FramelessEvent
     FramelessMouseHoverEvent();
 
     QPoint globalCursorPositon;
+
+    bool canWindowResize = true;
 };
 
 struct FramelessMousePressEvent : public FramelessEvent
@@ -47,7 +49,7 @@ struct FramelessMousePressEvent : public FramelessEvent
     FramelessMousePressEvent();
 
     QPoint globalCursorPositon;
-    bool canWindowMove = true;
+    bool canWindowMove = false;
 };
 
 struct FramelessMouseMoveEvent : public FramelessEvent
@@ -56,6 +58,7 @@ struct FramelessMouseMoveEvent : public FramelessEvent
 
     QPoint globalCursorPositon;
     bool canWindowResize = true;
+    bool canWindowMove = false;
 };
 
 struct FramelessMouseReleaseEvent : public FramelessEvent
