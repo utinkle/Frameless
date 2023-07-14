@@ -45,9 +45,10 @@ protected:
 
 private:
     explicit FramelessWorker(QObject *parent = nullptr);
+
 private:
     static FramelessWorker *    mInstance;
-    bool                        mExit;
+    bool                        mExit = false;
     QList<FramelessEvent *>     mEventQueue;
     QWaitCondition              mCondition;
     QMutex                      mMutex;

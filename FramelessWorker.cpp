@@ -21,7 +21,8 @@ FramelessWorker *FramelessWorker::instance()
     if (mInstance)
         return mInstance;
 
-    return new FramelessWorker;
+    mInstance = new FramelessWorker;
+    return mInstance;
 }
 
 void FramelessWorker::exit()
@@ -63,11 +64,6 @@ void FramelessWorker::run()
             break;
         }
 
-        if (event->type() == FramelessEvent::UnkonwEvent) {
-            delete event;
-            continue;
-        }
-
         switch (event->type()) {
         case FramelessEvent::FocusIn:
             focusIn(static_cast<FramelessFocusInEvent *>(event));
@@ -100,27 +96,28 @@ void FramelessWorker::run()
         delete event;
     }
 }
+
 FramelessWorker::DirAndCursorShape FramelessWorker::calcDirAndCursorShape(const QRect &rOrigin, const QPoint &cursorGlobalPoint, int framelessBorder)
 {
     int x = cursorGlobalPoint.x();
     int y = cursorGlobalPoint.y();
 
     DirAndCursorShape dirAndShape;
-    if (rOrigin.x() + framelessBorder >= x
+    if (rOrigin.x() + framelessBorder > x
             && rOrigin.x() <= x
-            && rOrigin.y() + framelessBorder >= y
+            && rOrigin.y() + framelessBorder > y
             && rOrigin.y() <= y) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::TopLeft);
         dirAndShape.cursorShape = Qt::SizeFDiagCursor;
-    } else if (x >= rOrigin.right() - framelessBorder
+    } else if (x > rOrigin.right() - framelessBorder
               && x <= rOrigin.right()
-              && y >= rOrigin.bottom() - framelessBorder
+              && y > rOrigin.bottom() - framelessBorder
               && y <= rOrigin.bottom()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::BottomRight);
         dirAndShape.cursorShape = Qt::SizeFDiagCursor;
-    } else if (x <= rOrigin.x() + framelessBorder
+    } else if (x < rOrigin.x() + framelessBorder
               && x >= rOrigin.x()
-              && y >= rOrigin.bottom() - framelessBorder
+              && y > rOrigin.bottom() - framelessBorder
               && y <= rOrigin.bottom()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::BottomLeft);
         dirAndShape.cursorShape = Qt::SizeBDiagCursor;
@@ -130,16 +127,16 @@ FramelessWorker::DirAndCursorShape FramelessWorker::calcDirAndCursorShape(const 
               && y <= rOrigin.y() + framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::TopRight);
         dirAndShape.cursorShape = Qt::SizeBDiagCursor;
-    } else if (x <= rOrigin.x() + framelessBorder && x >= rOrigin.x()) {
+    } else if (x < rOrigin.x() + framelessBorder && x >= rOrigin.x()) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Left);
         dirAndShape.cursorShape = Qt::SizeHorCursor;
-    } else if (x <= rOrigin.right() && x >= rOrigin.right() - framelessBorder) {
+    } else if (x <= rOrigin.right() && x > rOrigin.right() - framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Right);
         dirAndShape.cursorShape = Qt::SizeHorCursor;
-    } else if (y >= rOrigin.y() && y <= rOrigin.y() + framelessBorder) {
+    } else if (y >= rOrigin.y() && y < rOrigin.y() + framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Up);
         dirAndShape.cursorShape = Qt::SizeVerCursor;
-    } else if (y <= rOrigin.bottom() && y >= rOrigin.bottom() - framelessBorder) {
+    } else if (y <= rOrigin.bottom() && y > rOrigin.bottom() - framelessBorder) {
         dirAndShape.dir = static_cast<int>(Frameless::Direction::Down);
         dirAndShape.cursorShape = Qt::SizeVerCursor;
     } else {
@@ -218,7 +215,7 @@ QRect FramelessWorker::calcPositionRect(int dir, QWidget *target, const QRect &r
         }
 
         if (rOrigin.bottom() - gloPoint.y() <= target->minimumHeight()) {
-            rMove.setY(rOrigin.bottom());
+            rMove.setY(rOrigin.top());
         } else {
             rMove.setY(gloPoint.y());
         }
@@ -293,7 +290,8 @@ QPoint FramelessWorker::calcFakeGlobalPos(QWidget *taget, const QPoint &gloPoint
 
 void FramelessWorker::focusIn(FramelessFocusInEvent *event)
 {
-    if (!event->canWindowResize)
+    if (!event->canWindowResize
+            || event->target->isFullScreen() || event->target->isMaximized())
         return;
 
     DirAndCursorShape dirAndShape = calcDirAndCursorShape(calcOriginRect(event->target),
@@ -306,9 +304,9 @@ void FramelessWorker::focusIn(FramelessFocusInEvent *event)
 
 void FramelessWorker::mouseHover(FramelessMouseHoverEvent *event)
 {
-
     if (event->frameless->leftMouseButtonPressed()
-            || !event->canWindowResize)
+            || !event->canWindowResize
+            || event->target->isFullScreen())
         return;
 
     QWidget *window = event->target->window();
@@ -334,12 +332,15 @@ void FramelessWorker::mousePress(FramelessMousePressEvent *event)
     event->frameless->setLeftMouseButtonPressed(true);
 
     if (event->frameless->direction() == Frameless::Direction::None) {
-        if (event->canWindowMove) {
+        event->frameless->setCurrentCanWindowMove(event->canWindowMove);
+
+        if (event->canWindowMove && (!event->target->isFullScreen() && !event->target->isMaximized())) {
             event->frameless->setDragPosition(event->globalCursorPositon - event->target->frameGeometry().topLeft());
-            QMetaObject::invokeMethod(event->frameless, "setCursorByFrameless", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(event->frameless, "readyToStartMove", Qt::QueuedConnection,
                                       Q_ARG(int, int(Qt::SizeAllCursor)));
         }
     } else {
+        QMetaObject::invokeMethod(event->frameless, "accpetSystemResize", Qt::QueuedConnection);
         event->target->releaseMouse();
     }
 }
@@ -350,8 +351,8 @@ void FramelessWorker::mouseMove(FramelessMouseMoveEvent *event)
 
     if (event->frameless->leftMouseButtonPressed()
             && (event->frameless->direction() == Frameless::Direction::None)
-            && event->canWindowMove) {
-        if (event->target->isMaximized()) {
+            && event->frameless->currentCanWindowMove()) {
+        if (event->target->isMaximized() || event->target->isFullScreen() || event->frameless->acceptSystemMoving()) {
             // event->target->showNormal();
 
             // double xRatio = event->globalX() * 1.0 / event->target->width();
@@ -371,7 +372,10 @@ void FramelessWorker::mouseMove(FramelessMouseMoveEvent *event)
         return;
     }
 
-    if (event->frameless->leftMouseButtonPressed() && event->canWindowResize) {
+    if (!event->frameless->acceptSystemResize() && event->frameless->leftMouseButtonPressed() && event->canWindowResize) {
+        if (event->target->isMaximized() || event->target->isFullScreen())
+            return;
+
         gloPoint = calcFakeGlobalPos(event->target, gloPoint);
 
         const QRect &rect = calcPositionRect(static_cast<int>(event->frameless->direction()),

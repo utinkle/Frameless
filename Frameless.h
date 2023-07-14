@@ -43,11 +43,22 @@ public:
     void setDirection(Direction dir);
     Direction direction() const;
 
+    void setCurrentCanWindowMove(bool canWindowMove);
+    bool currentCanWindowMove() const;
+
     void setDragPosition(const QPoint &dragPosition);
     QPoint dragPosition() const;
 
     void setLeftMouseButtonPressed(bool pressed);
     bool leftMouseButtonPressed() const;
+
+    void setAcceptSystemResize(bool accept);
+    bool acceptSystemResize() const;
+
+    void setAcceptSystemMoving(bool accept);
+    bool acceptSystemMoving() const;
+
+    bool framelessMoving() const;
 
     void targetEvent(QEvent *event);
 
@@ -55,19 +66,30 @@ public:
     Q_INVOKABLE void setGeometryByFrameless(const QRect &rect);
     Q_INVOKABLE void setCursorByFrameless(int shape);
     Q_INVOKABLE void unsetCursorByFrameless();
+    Q_INVOKABLE void readyToStartMove(int shape);
+    Q_INVOKABLE void accpetSystemResize();
+
+private:
+    bool startSystemResize(QWidget *window, const QPoint &, int dir);
+    bool startSystemMove(QWidget *window, const QPoint &);
+    void deactivateWindowWhenSystemMove(QWidget *window);
 
 private:
     // worker and target
     QWidget *           mSelf;
     FramelessWorker *   mWorker;
-    bool                mCanWindowMove;
-    bool                mCanWindowResize;
+    bool                mCanWindowMove = false;
+    bool                mCanWindowResize = false;
 
     // state for window
     QPoint              mDragPosition;
     Direction           mDir;
-    bool                mLeftButtonPress;
-    bool                mAlreadyChangeCursor;
+    bool                mLeftButtonPress = false;
+    bool                mAlreadyChangeCursor = false;
+    bool                mCurrentCanWindowMove = false;
+    int                 mOverrideCursorShape = false;
+    bool                mAcceptSystemResize = false;
+    bool                mAcceptSystemMoving = false;
 };
 
 #endif // FRAMELESS_H

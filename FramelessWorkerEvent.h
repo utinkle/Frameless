@@ -58,7 +58,6 @@ struct FramelessMouseMoveEvent : public FramelessEvent
 
     QPoint globalCursorPositon;
     bool canWindowResize = true;
-    bool canWindowMove = false;
 };
 
 struct FramelessMouseReleaseEvent : public FramelessEvent
@@ -69,5 +68,10 @@ struct FramelessMouseReleaseEvent : public FramelessEvent
 struct FramelessLeaveEvent : public FramelessEvent
 {
     FramelessLeaveEvent();
+};
+
+struct FramelessWindowDeactivateEvent : FramelessEvent
+{
+    FramelessWindowDeactivateEvent();
 };
 #endif // FRAMELESSWORKEREVENT_H
